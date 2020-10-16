@@ -4,7 +4,7 @@
 import requests
 import json
 
-login='lifefucky'
+login=#LOGIN
 password=input('Press the password:')
 
 r = requests.get('https://api.github.com/user/repos', auth=(login, password))
@@ -12,6 +12,9 @@ r = requests.get('https://api.github.com/user/repos', auth=(login, password))
 with open(login+'_public_repos.json', 'w', encoding='utf-8') as json_file:
     json.dump(r.json(), json_file, ensure_ascii=False, indent=4)
 
-for repo in r.json():
+data = json.loads(r.text)
+
+
+for repo in data:
     if not repo['private']:
         print(repo['name'])
