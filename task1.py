@@ -1,18 +1,9 @@
-'''
-Необходимо собрать информацию о вакансиях на вводимую должность (используем input или через аргументы) с
-сайтов Superjob и HH. Приложение должно анализировать несколько страниц сайта (также вводим через input или аргументы).
-Получившийся список должен содержать в себе минимум:
-Наименование вакансии.
-Предлагаемую зарплату (отдельно минимальную, максимальную и валюту).
-Ссылку на саму вакансию.
-Сайт, откуда собрана вакансия.
-По желанию можно добавить ещё параметры вакансии (например, работодателя и расположение).
-Структура должна быть одинаковая для вакансий с обоих сайтов. Общий результат можно вывести с помощью dataFrame
-через pandas.'''
-
-from bs4 import BeautifulSoup as bs
+'''1. Развернуть у себя на компьютере/виртуальной машине/хостинге MongoDB и реализовать функцию,
+записывающую собранные вакансии в созданную БД.'''
+'''from bs4 import BeautifulSoup as bs'''
+import bs4
 import requests
-import pandas as pd
+'''from pymongo import MongoClient'''
 
 def salary_to_dict_HH(salary):
     '''Function works with scrapped string with salary data from HeadHunter and returns net values'''
@@ -53,7 +44,9 @@ def salary_to_dict_sj(salary):
         dict['currency'] = dict0[-1]
     return dict['from'], dict['to'], dict['currency']
 
-print('I will find some jobs for you, be ready for relocation, case when you live in another city, but offer seems attractive!)')
+'''client = MongoClient('127.0.0.1', 27017)
+db = client['jobs']
+collection = db['jobs_list']'''
 
 job_title=input('Please write the key word for your search:')
 length = input("Please insert minimal number of jobs you want to see from each of services or write 'Y' to see all:")
@@ -75,7 +68,7 @@ href='/search/vacancy?clusters=true&area=1&search_field=name&enable_snippets=tru
 raw_jobdata = []
 while True:
     response = requests.get(main_link+href,  headers=headers)
-    soup =  bs(response.text, 'html.parser')
+    soup =  bs4.BeautifulSoup(response.text, 'html.parser')
     try:
         href=soup.find('a',{'data-qa':'pager-next'})['href']
     except:
@@ -122,7 +115,7 @@ for jobs in raw_jobdata:
     job_data['link'] = job_link
     job.append(job_data)
 
-job_df_hh = pd.DataFrame.from_dict(job)
+
 
 '''
     SuperJob
@@ -140,7 +133,7 @@ while current_page <= length:
               'page': current_page
               }
     response = requests.get(main_link+'/vacancy/search/', params=params, headers=headers)
-    soup = bs(response.text,'html.parser')
+    soup = bs4.BeautifulSoup(response.text,'html.parser')
     total_count= int(soup.find('span',{'class':'_1ZlLP'}).text.split(' ')[1])
     vacancies  = soup.findAll('div', {'class': 'jNMYr'})
     companies = soup.findAll('div', {'class', '_3_eyK _3P0J7 _9_FPy'})
@@ -182,9 +175,7 @@ for company in company_list:
     company_locations.append(' '.join(company_location[delimiter_+1:]))
 
 dict = {'service':'Superjob','name':job_names, 'employer':company_names, 'location':company_locations, 'SalaryFrom':job_salaries_from, 'SalaryTo':job_salaries_to,'SalaryCurrency':job_salaries_currency,'link': job_links}
+job.extend(job_data)
 
-job_df_sj = pd.DataFrame.from_dict(dict)
-
-result_df=pd.concat([job_df_hh,job_df_sj])
-result_df.to_csv('Vacancies.csv', header=True, index=False)
-print('Данные сохранены в файл Vacancies.csv')
+for i in job:
+    print(i)
