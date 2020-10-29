@@ -1,9 +1,7 @@
-'''1. Развернуть у себя на компьютере/виртуальной машине/хостинге MongoDB и реализовать функцию,
-записывающую собранные вакансии в созданную БД.'''
-'''from bs4 import BeautifulSoup as bs'''
-import bs4
 import requests
-'''from pymongo import MongoClient'''
+import bs4
+from pymongo import MongoClient
+
 
 def salary_to_dict_HH(salary):
     '''Function works with scrapped string with salary data from HeadHunter and returns net values'''
@@ -44,9 +42,9 @@ def salary_to_dict_sj(salary):
         dict['currency'] = dict0[-1]
     return dict['from'], dict['to'], dict['currency']
 
-'''client = MongoClient('127.0.0.1', 27017)
+client = MongoClient('127.0.0.1', 27017)
 db = client['jobs']
-collection = db['jobs_list']'''
+collection = db['jobs_list']
 
 job_title=input('Please write the key word for your search:')
 length = input("Please insert minimal number of jobs you want to see from each of services or write 'Y' to see all:")
@@ -106,7 +104,7 @@ for jobs in raw_jobdata:
     company_location = jobs.find('span', {'data-qa': 'vacancy-serp__vacancy-address'}).text
 
     job_data['service']='HeadHunter'
-    job_data['name'] = job_name
+    job_data['name'] = job_name.replace('\xa0', '')
     job_data['employer'] = company_name
     job_data['location'] = company_location
     job_data['SalaryFrom'] = job_salary_from
@@ -127,16 +125,17 @@ main_link='https://www.superjob.ru'
 current_page = 1
 jobs_list = []
 company_list = []
-while current_page <= length:
+while len(jobs_list)<length:
     params = {'keywords': job_title,
               'noGeo': True,  # поиск без фильтров на локацию
               'page': current_page
               }
     response = requests.get(main_link+'/vacancy/search/', params=params, headers=headers)
     soup = bs4.BeautifulSoup(response.text,'html.parser')
-    total_count= int(soup.find('span',{'class':'_1ZlLP'}).text.split(' ')[1])
-    vacancies  = soup.findAll('div', {'class': 'jNMYr'})
+    total_count = int(soup.find('span',{'class':'_1ZlLP'}).text.split(' ')[1])
+    vacancies = soup.findAll('div', {'class': 'jNMYr'})
     companies = soup.findAll('div', {'class', '_3_eyK _3P0J7 _9_FPy'})
+
     if not vacancies:
         if len(jobs_list)<total_count:
             print('SuperJob: Scrapped '+str(len(jobs_list))+' jobs. To get more info you should log in!')
@@ -145,6 +144,10 @@ while current_page <= length:
         break
     jobs_list.extend(vacancies)
     company_list.extend(companies)
+    if len(jobs_list)>length:
+        jobs_list = jobs_list[:length]
+        company_list = company_list[:length]
+        break
     current_page +=1
 
 job_names=[]
@@ -156,7 +159,7 @@ job_links=[]
 for jobs in jobs_list:
     job_name=jobs.find('a',{'class':'_6AfZ9'})
     job_links.append(main_link+job_name['href'])
-    job_names.append(job_name.text)
+    job_names.append(job_name.text.replace('\xa0', ''))
     job_salary=jobs.find('span',{'class':'_2Wp8I'}).text
     job_salary_from, job_salary_to, job_salary_currency = salary_to_dict_sj(job_salary)
     job_salaries_from.append(job_salary_from)
@@ -165,6 +168,7 @@ for jobs in jobs_list:
 
 company_names = []
 company_locations = []
+test_list =[]
 
 for company in company_list:
     company_name = company.find('a', {'class': '_25-u7'})
@@ -174,8 +178,12 @@ for company in company_list:
     delimiter_ = company_location.index('•')
     company_locations.append(' '.join(company_location[delimiter_+1:]))
 
-dict = {'service':'Superjob','name':job_names, 'employer':company_names, 'location':company_locations, 'SalaryFrom':job_salaries_from, 'SalaryTo':job_salaries_to,'SalaryCurrency':job_salaries_currency,'link': job_links}
-job.extend(job_data)
+for i in range(len(jobs_list)):
+    dict = {'service':'Superjob','name':job_names[i], 'employer':company_names[i], 'location':company_locations[i], 'SalaryFrom':job_salaries_from[i], 'SalaryTo':job_salaries_to[i],'SalaryCurrency':job_salaries_currency[i],'link': job_links[i]}
+    job.append(dict)
 
-for i in job:
-    print(i)
+collection.delete_many({})
+collection.insert_many(job)
+
+for raw in collection.find():
+    print(raw)
