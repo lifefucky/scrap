@@ -10,7 +10,7 @@ def salary_to_dict_HH(salary):
     num = []
     for n in dict0:
         try:
-            num.append(int(n.replace(u'\xa0', '')))
+            num.append(float(n.replace(u'\xa0', '')))
         except:
             pass
     if len(num)>1:
@@ -104,7 +104,7 @@ for jobs in raw_jobdata:
     company_location = jobs.find('span', {'data-qa': 'vacancy-serp__vacancy-address'}).text
 
     job_data['service']='HeadHunter'
-    job_data['name'] = job_name.replace('\xa0', '')
+    job_data['name'] = job_name.replace('\xa0', ' ')
     job_data['employer'] = company_name
     job_data['location'] = company_location
     job_data['SalaryFrom'] = job_salary_from
@@ -159,7 +159,7 @@ job_links=[]
 for jobs in jobs_list:
     job_name=jobs.find('a',{'class':'_6AfZ9'})
     job_links.append(main_link+job_name['href'])
-    job_names.append(job_name.text.replace('\xa0', ''))
+    job_names.append(job_name.text.replace('\xa0', ' '))
     job_salary=jobs.find('span',{'class':'_2Wp8I'}).text
     job_salary_from, job_salary_to, job_salary_currency = salary_to_dict_sj(job_salary)
     job_salaries_from.append(job_salary_from)
