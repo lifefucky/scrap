@@ -1,93 +1,77 @@
-'''Написать приложение, которое собирает основные новости с сайтов news.mail.ru, lenta.ru, yandex-новости.
-Для парсинга использовать XPath. Структура данных должна содержать:
-название источника;
-наименование новости;
-ссылку на новость;
-дата публикации.
-Сложить собранные данные в БД'''
-
-
-from lxml import html
-import requests
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 from pymongo import MongoClient
+import time
 
 client = MongoClient('127.0.0.1', 27017)
-db = client['news']
-collection = db['news_list']
+db = client['Email']
+collection = db['mail_list']
 
-header = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36'}
+chrome_options = Options()
+chrome_options.add_argument('start-maximized')
 
-def db_insert_not_exists(cond, data):
-    '''Function inserts data to chosen collection if not already exists'''
-    collection.update_one(cond, {'$set': data}, upsert=True)
+driver = webdriver.Chrome('/users/mrlebovsky/Downloads/chromedriver',options=chrome_options)
+driver.get('https://mail.ru')
 
-'''news.mail.ru module'''
-main_link='https://news.mail.ru/'
-response =requests.get(main_link, headers=header)
-dom = html.fromstring(response.text)
-news = dom.xpath("//div[contains(@class, 'daynews__item')] | //a[@class='list__text']")
+login = WebDriverWait(driver, 5).until(
+    ec.visibility_of_element_located((By.ID, 'mailbox:login-input'))
+)
+login.send_keys('study.ai_172@mail.ru')
+login.send_keys(Keys.ENTER)
 
-cnt = 0
-for i in news:
-    news_data = {}
-    title =''.join([a.replace('\xa0',' ') for a in i.xpath(".//text()")])
-    link = i.xpath(".//@href")[0]
+passw = WebDriverWait(driver, 5).until(
+            ec.visibility_of_element_located((By.NAME, 'password'))
+        )
+passw.send_keys('NextPassword172')
+passw.send_keys(Keys.ENTER)
 
-    response =requests.get(link, headers=header)
-    dom2 = html.fromstring(response.text)
-    timer = dom2.xpath(".//span[contains(@class,'js-ago')]//@datetime")[0]
-    source = ''.join(dom2.xpath("//a[contains(@class, 'breadcrumbs__link')]/*/text()"))
+a=0
+mes_links = []
+while True:
+    l_ = len(mes_links)
+    letters_ = driver.find_elements_by_class_name('js-letter-list-item')
+    if len(letters_)==0:
+        letters_= WebDriverWait(driver, 5).until(
+            ec.presence_of_all_elements_located((By.CLASS_NAME, 'js-letter-list-item'))
+        )
+    links_ = [i.get_attribute('href') for i in letters_]
+    mes_links.extend(links_)
+    mes_links = list(dict.fromkeys(mes_links))
+    actions = ActionChains(driver)
+    actions.move_to_element(letters_[-1])
+    actions.perform()
+    if l_==len(mes_links):
+        break
 
-    news_data['title'] = title
-    news_data['link'] = link
-    news_data['datetime'] = timer
-    news_data['source'] = source
-    db_insert_not_exists({'link': news_data.get('link')}, news_data)
-    cnt+=1
-print('First source - '+str(cnt))
-'''lenta.ru module'''
-main_link='https://lenta.ru'
-response =requests.get(main_link, headers=header)
-dom = html.fromstring(response.text)
-news = dom.xpath("//div[@class='first-item']/*/a | //div[contains(@class,'js-main__content')]/*//div[@class='item']/a")
+print('Scrapped '+str(len(mes_links))+' mails!')
 
-cnt = 0
-for i in news:
-    news_data = {}
+collection.delete_many({})
+for link in mes_links:
+    mess_data={}
+    driver.get(link)
+    try:
+        contact = driver.find_element_by_class_name('letter-contact')
+    except:
+        contact = WebDriverWait(driver, 10).until(
+            ec.presence_of_element_located((By.CLASS_NAME, 'letter-contact'))
+            )
+    mess_data['MailFrom']=contact.get_attribute('title')
+    try:
+        date = driver.find_element_by_class_name('letter__date')
+    except:
+        date = WebDriverWait(driver, 10).until(
+            ec.presence_of_element_located((By.CLASS_NAME, 'letter__date'))
+            )
+    mess_data['MailDate']=date.text
+    mess_data['MailSubject']=driver.find_element_by_tag_name('h2').text
+    mess_data['MailText']=driver.find_element_by_class_name('letter-body').text.replace('\n','')
+    collection.insert_one(mess_data)
 
-    title = ''.join([a.replace('\xa0', ' ') for a in i.xpath("./text()")])
-    link = main_link+i.xpath("./@href")[0]
-    timer = i.xpath("./time/@datetime")[0]
-
-    news_data['title'] = title
-    news_data['link'] = link
-    news_data['datetime'] = timer
-    news_data['source'] = 'Lenta.ru'
-    db_insert_not_exists({'link': news_data.get('link')}, news_data)
-    cnt+=1
-print('Second source - '+str(cnt))
-'''yandex news module'''
-
-main_link='https://yandex.ru/news'
-response =requests.get(main_link, headers=header)
-dom = html.fromstring(response.text)
-news = dom.xpath("//div[contains(@class,'news-top-stories')]/div[contains(@class,'mg-grid__col')]")
-
-cnt=0
-for i in news:
-    news_data = {}
-
-    title = i.xpath(".//a[@rel]//text()")[0]
-    link = i.xpath(".//a[@rel]/@href")[0]
-
-    source =  i.xpath(".//div[contains(@class, 'news-card__source')]//span[contains(@class,'mg-card-source__source')]/a/text()")
-    timer = i.xpath(".//div[contains(@class, 'news-card__source')]//span[contains(@class,'mg-card-source__time')]/text()")
-
-    news_data['title'] = title
-    news_data['link'] = link
-    news_data['datetime'] = timer
-    news_data['source'] = source
-    db_insert_not_exists({'link': news_data.get('link')}, news_data)
-    cnt += 1
-print('Third source - '+str(cnt))
+driver.close()
+print('Finished!')
 
