@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from pymongo import MongoClient
-import time
+
 
 client = MongoClient('127.0.0.1', 27017)
 db = client['Email']
