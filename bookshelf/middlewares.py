@@ -3,13 +3,14 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+#plug custom functionality to process the responses that are sent to Spiders for processing and to process the requests and items that are generated from spiders
 from scrapy import signals
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
 
-class BookshelfSpiderMiddleware:
+class JobparserSpiderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the
     # passed objects.
@@ -56,7 +57,7 @@ class BookshelfSpiderMiddleware:
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class BookshelfDownloaderMiddleware:
+class JobparserDownloaderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
